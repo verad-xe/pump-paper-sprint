@@ -56,6 +56,10 @@ const TRAIL_DROP_BPS = 1000; // ... then sell on a 10% fall from the best value
 const TIME_EXIT_SLOTS = 12; // sell ~10 slots after the buy filled
 const BUY_SLIPPAGE_BPS = 10_000; // wide open: a buy must not fail on 2 slots of drift
 const SELL_SLIPPAGE_BPS = 10_000; // exits must land; retrying costs slots we do not have
+// Note: exits use 10_000 bps of slippage deliberately. With a 2-slot latency
+// and a hold of only ~10 slots, a sell refused for slippage is a sell that
+// never happens before the time exit; the value-based stop-loss already
+// prices the exit, so the slippage guard adds nothing here.
 const CURVE_FEE_BPS = 125n; // protocol 95 + creator 30 bps, charged on the curve
 const BPS = 10_000n;
 
@@ -180,7 +184,11 @@ await runBot({
     // 3. Entries: every fresh coin, in first-seen order, decided once.
     // A coin is judged on every batch while it is still young, not only on
     // batches that carry one of its events, so a coin that becomes buyable a
-    // few slots after creation is not missed.
+    // few slots after creation is not missed. The 3-slot window is the whole
+    // edge: on the dev window, coins bought more than a few slots after
+    // creation had already handed their pop to earlier buyers (v1, which
+    // allowed entries up to 3600 slots old, lost -1.83 SOL; this shape
+    // loses -0.31 SOL with the same exits).
     let free = state.freeCashLamports();
     let slots = caps.max_open_positions - state.committedPositionCount();
     for (const [mint, c] of coins) {
